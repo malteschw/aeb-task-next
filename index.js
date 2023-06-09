@@ -11,6 +11,10 @@ const bodyParser = require('body-parser')
  */
 app.use(bodyParser.json());
 
+/**
+ * wenn man sich genau an die Liste hält, ist der Pfad zu boxNumber falsch (boxData.boxNumber)
+ * als auch soldTo.SoldToCode (soldToCode - klein geschrieben).
+ */
 const mandatoryFields = [
     "msgId",
     "sender",
@@ -27,7 +31,7 @@ const mandatoryFields = [
  * JSON Validator
  */
 function inputValidator(input) {
-    let missingFields = {};
+    let missingFields = [];
     const objectToCheck = input["boxPackingRequest"]["messageHeader"]
 
     mandatoryFields.forEach((field) => {
@@ -38,6 +42,7 @@ function inputValidator(input) {
         if (field.includes('.')) {
             let split = field.split('.')
             let temp = objectToCheck;
+            let keyList = [];
 
 
             /**
@@ -46,24 +51,25 @@ function inputValidator(input) {
              */
             split.forEach((currentSplit) => {
                 currentValue = temp[currentSplit]
-                lastKey = currentSplit;
+                keyList.push(currentSplit);
                 temp = objectToCheck[currentSplit]
-
             })
+
+            /**
+             * Pfad zum letzten Key, falls gesplittet wurde
+             */
+            lastKey = keyList.join(".")
 
         } else {
             currentValue = objectToCheck[field]
         }
-
 
         /**
          * Falls value null oder kein String ist, kann nicht validiert werden
          * -> fehlendes Feld wird der Liste hinzugefügt
          */
         if (currentValue === null || typeof currentValue !== 'string') {
-            console.log("LAST KEY", lastKey)
-            console.log("VALUE ", currentValue)
-            missingFields[lastKey] = "NULL";
+            missingFields.push(lastKey);
         }
 
     })
@@ -72,7 +78,6 @@ function inputValidator(input) {
      * Länge bestimmt ob validiert werden kann
      * 0 === alles passt, alles drüber gibt fehlende Werte (keys) zurück
      */
-    console.log("MISSING FIELDS " + JSON.stringify(missingFields));
     return missingFields;
 
 }
@@ -88,11 +93,22 @@ app.post('/json', (req, res) => {
     if (missingFields.length === 0) {
         res.status(200).send("ok")
     } else {
-        res.status(400).send("error")
+
+        const errorBody = {
+            status: "error",
+            missingFields: missingFields
+        }
+
+        res.status(400).send(errorBody)
     }
-    //res.send('JSON send');
+
 });
 
+
+
+app.get('/', (req, res) => {
+    res.send('JSON Validator - /json für POST')
+})
 
 /**
  * start Server
